@@ -11,6 +11,7 @@ public class FileServerApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(FileServerApplication.class, args);
+        System.out.println("File Server Application Started Successfully");
     }
 
 }

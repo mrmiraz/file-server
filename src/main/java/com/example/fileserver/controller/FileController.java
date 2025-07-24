@@ -1,6 +1,6 @@
 package com.example.fileserver.controller;
 
-import com.example.fileserver.domain.entity.FileMetadata;
+import com.example.fileserver.domain.dto.FileMetadata;
 import com.example.fileserver.service.FileService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -23,8 +23,7 @@ public class FileController {
 
     @PostMapping("/upload")
     public ResponseEntity<FileMetadata> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        System.out.println("File upload request received: " + file.getOriginalFilename());
-        return ResponseEntity.ok(fileService.storeFile(file));
+        return ResponseEntity.ok(fileService.storeRandomFile(file, "defaultType", 0L));
     }
 
     @PostMapping("/upload-multiple")
@@ -59,8 +58,8 @@ public class FileController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/list")
+    /*@GetMapping("/list")
     public ResponseEntity<List<FileMetadata>> list() {
         return ResponseEntity.ok(fileService.listAllFiles());
-    }
+    }*/
 }

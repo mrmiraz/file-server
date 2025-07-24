@@ -1,20 +1,6 @@
 package com.example.fileserver.service;
 
-import com.example.fileserver.config.StorageProperties;
-import com.example.fileserver.domain.entity.FileMetadata;
-import com.example.fileserver.repository.FileMetadataRepository;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 public class FileServiceImpl  {
