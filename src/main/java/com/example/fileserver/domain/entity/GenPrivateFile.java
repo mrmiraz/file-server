@@ -9,7 +9,6 @@ import lombok.Setter;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -33,9 +32,8 @@ public class GenPrivateFile implements Serializable {
     private String fileName;
     @Column(name = "disk_path")
     private String diskPath;
-    @Lob
-    @Column(name = "web_uuid")
-    private UUID webUuid;
+    @Column(name = "web_path")
+    private String webPath;
     @Column(name = "is_deleted")
     @Convert(converter = BooleanToIntegerConverter.class)
     private Boolean isDeleted;
