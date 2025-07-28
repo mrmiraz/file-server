@@ -1,7 +1,6 @@
 package com.example.fileserver.controller;
 
 import com.example.fileserver.domain.dto.ApiResponse;
-import com.example.fileserver.domain.dto.FileUploadRequest;
 import com.example.fileserver.service.FileService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -11,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 @RestController
 @RequestMapping("/api/files")
@@ -67,16 +65,12 @@ public class FileController {
     }
 
     @GetMapping("/view/{filename}/{token}")
-    public ResponseEntity<Resource> viewFile(@PathVariable String filename, @PathVariable String token)  {
-        try {
-            Resource resource = fileService.loadFileAsResource(filename, token);
-            String contentType = fileService.getContentType(resource);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .body(resource);
-        } catch (IOException e) {
-            return ResponseEntity.internalServerError().build();
-        }
+    public ResponseEntity<Resource> viewFile(@PathVariable String filename, @PathVariable String token) throws IOException {
+        Resource resource = fileService.loadFileAsResource(filename, token);
+        String contentType = fileService.getContentType(resource);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(resource);
     }
 
     @DeleteMapping("/{filename}/{token}")
@@ -89,4 +83,5 @@ public class FileController {
     public ResponseEntity<List<FileMetadata>> list() {
         return ResponseEntity.ok(fileService.listAllFiles());
     }*/
+
 }

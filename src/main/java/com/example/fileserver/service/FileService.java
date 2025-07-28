@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.*;
 
@@ -39,6 +40,8 @@ public class FileService {
 
     @Value("${comm.file.url}")
     private String FILE_SERVER_URL;// = "http://180.210.128.4:8081/admission-api/";
+    private final String RANDOM_FILE_FOLDER = "random";
+    private final String SPECIFIC_FILE_FOLDER = "specific";
 
     public FileService(StorageProperties properties, FileMetadataRepository repository, JwtUtil jwtUtil) {
         this.rootLocation = Paths.get(properties.getLocation());
@@ -51,9 +54,8 @@ public class FileService {
         }
     }
 
-    //@Todo save with byte array
-    //@Todo save with specific file name
-
+    //save with byte array
+    //save with specific file name
     public FileMetadata storeSpecificFile(byte[] fileData, String directory, String fileName, String objectType, Long objectId) throws IOException {
         if (fileData == null) {
             throw new BadRequestException("Uploaded file has no content.");
@@ -161,20 +163,19 @@ public class FileService {
             throw new BadRequestException("Uploaded file has no content.");
         }
         // Get current date for folder structure
-        LocalDate today = LocalDate.now();
-        String monthFolder = today.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + today.getYear();  // e.g., "January 2025"
-        String dayFolder = today.getDayOfMonth() + " " + today.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);  // e.g., "12 January"
-
-        // Resolve final destination folder and file
-        Path destinationFolder;
-        Path relativeDiskPath;
+        Path destinationFolder, relativeDiskPath;
+        //For specific file, use the specified directory
         if (!FieldValidator.isBlank(specifiedDirectory)) {
-            destinationFolder = rootLocation.resolve(Paths.get(monthFolder, dayFolder, specifiedDirectory));
-            relativeDiskPath = Paths.get(monthFolder, dayFolder, specifiedDirectory, storedFileName);
+            destinationFolder = rootLocation.resolve(Paths.get(SPECIFIC_FILE_FOLDER, specifiedDirectory));
+            relativeDiskPath = Paths.get(SPECIFIC_FILE_FOLDER, specifiedDirectory, storedFileName);
         }
+        //For random file, use the specified directory
         else {
-            destinationFolder = rootLocation.resolve(Paths.get(monthFolder, dayFolder));
-            relativeDiskPath = Paths.get(monthFolder, dayFolder, storedFileName);
+            LocalDate today = LocalDate.now();
+            String monthFolder = today.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + today.getYear();  // e.g., "January 2025"
+            String dayFolder = today.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));  // e.g., "27-04-2025"
+            destinationFolder = rootLocation.resolve(Paths.get(RANDOM_FILE_FOLDER, monthFolder, dayFolder));
+            relativeDiskPath = Paths.get(RANDOM_FILE_FOLDER, monthFolder, dayFolder, storedFileName);
         }
         Files.createDirectories(destinationFolder);  // creates folder if not exist
 
@@ -299,4 +300,7 @@ public class FileService {
         String contentType = Files.probeContentType(filePath);
         return (contentType != null) ? contentType : "application/octet-stream";
     }
+
+
+    //@Todo url again web path
 }
