@@ -1,10 +1,12 @@
 package com.example.fileserver.service;
 
 import com.example.fileserver.config.StorageProperties;
-import com.example.fileserver.domain.dto.ByteArrayMultipartFile;
 import com.example.fileserver.domain.dto.FileMetadata;
+import com.example.fileserver.domain.dto.MyFilePart;
 import com.example.fileserver.domain.entity.GenPrivateFile;
 import com.example.fileserver.exception.BadRequestException;
+import com.example.fileserver.exception.CustomException;
+import com.example.fileserver.exception.ResourceNotFoundException;
 import com.example.fileserver.exception.UnauthorizedException;
 import com.example.fileserver.repository.FileMetadataRepository;
 import com.example.fileserver.util.JwtUtil;
@@ -25,7 +27,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 @Service
 public class FileService {
@@ -50,115 +55,48 @@ public class FileService {
         try {
             Files.createDirectories(rootLocation);
         } catch (IOException e) {
-            throw new RuntimeException("Could not initialize storage", e);
+            throw new CustomException("Could not initialize storage");
         }
     }
 
-    //save with byte array
-    //save with specific file name
-    public FileMetadata storeSpecificFile(byte[] fileData, String directory, String fileName, String objectType, Long objectId) throws IOException {
-        if (fileData == null) {
-            throw new BadRequestException("Uploaded file has no content.");
-        }
+    private FileMetadata saveFileMetaToDatabase(MyFilePart uploadedFile, Path storedPath, UUID uuid, String objectType, Long objectId) throws IOException {
+        //Save file metadata to database
+        GenPrivateFile fileEntity = new GenPrivateFile();
+        fileEntity.setDiskPath(storedPath.toString());
+        fileEntity.setCreationDate(LocalDateTime.now());
+        fileEntity.setFileExtension(uploadedFile.getExtension());
+        fileEntity.setIsDeleted(false);
+        fileEntity.setMimeType(uploadedFile.getContentType());
+        fileEntity.setFileName(uploadedFile.getOriginalFilename());
+        fileEntity.setObjectType(objectType);
+        fileEntity.setObjectId(objectId);
+        fileEntity.setWebPath(uuid.toString());
 
-        if (FieldValidator.isBlank(directory)) {
-            throw new BadRequestException("Directory is required.");
-        }
+        //JWT token generation for file access
+        String jwt = jwtUtil.generateAccessToken(uuid.toString());
+        fileEntity.setFileSizeMb(uploadedFile.getSizeMb());
+        fileEntity = repository.save(fileEntity);
 
-        if (FieldValidator.isBlank(objectType)) {
-            throw new BadRequestException("Object type is required.");
-        }
-        MultipartFile uploadedFile = byteArrayToMultipartFileExample(fileData, fileName);
-        return  storeSpecificFile(uploadedFile, directory, fileName, objectType, objectId);
+        //Create FileMetadata object to return
+        FileMetadata fd = new FileMetadata();
+        fd.setFileId(fileEntity.getId());
+        fd.setCreationDate(fileEntity.getCreationDate());
+        fd.setDownloadPath(FILE_SERVER_URL + "/files/download/"
+                + fileEntity.getWebPath() + "/" + jwt);
+        fd.setFileExtension(fileEntity.getFileExtension());
+        fd.setFileName(fileEntity.getFileName());
+        fd.setFileSizeMb(fileEntity.getFileSizeMb());
+        fd.setMimeType(fileEntity.getMimeType());
+        fd.setObjectId(fileEntity.getObjectId());
+        fd.setObjectType(fileEntity.getObjectType());
+        fd.setThumbnailBas64(fileEntity.getThumbnailBas64());
+        fd.setViewPath(FILE_SERVER_URL + "/files/view/"
+                + fileEntity.getWebPath() + "/" + jwt);
+        fd.setCreatedBy(fileEntity.getCreatedBy());
+        return fd;
     }
 
-    //directory mandatory, fileName null -> random uuid with extension
-    public FileMetadata storeSpecificFile(MultipartFile uploadedFile, String directory, String fileName, String objectType, Long objectId) throws IOException {
-        if (uploadedFile == null) {
-            throw new BadRequestException("Uploaded file has no content.");
-        }
-
-        if (FieldValidator.isBlank(objectType)) {
-            throw new BadRequestException("Object type is required.");
-        }
-
-        if (FieldValidator.isBlank(directory)) {
-            throw new BadRequestException("Directory is required.");
-        }
-
-        try {
-            String extension = "";
-            extension = "";
-            int i = uploadedFile.getOriginalFilename().lastIndexOf('.');
-            if (i > 0) {
-                extension = uploadedFile.getOriginalFilename().substring(i + 1);
-            }
-            //If extension empty
-            if(FieldValidator.isBlank(extension)){
-                extension = "txt";
-            }
-            UUID uuid = UUID.randomUUID();
-            String storedFileName = uuid + "." + extension;
-
-            //if the file name is not provided, use uuid with extension
-            String originalFileName = FieldValidator.isBlank(fileName) ? storedFileName : fileName;
-
-            //Upload file to disk
-            Path relativeDiskPath = uploadFileToDisk(uploadedFile, storedFileName, directory);
-
-            //Save file metadata to database
-            return saveFileMetaToDatabase(uploadedFile, relativeDiskPath, uuid, extension, objectType, objectId, originalFileName);
-        } catch (Exception ex) {
-            System.out.println("exception occured ");
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-    public FileMetadata storeRandomFile(byte[] fileData, String objectType, Long objectId) throws IOException {
-        if (FieldValidator.isBlank(fileData)) {
-            throw new BadRequestException("Uploaded file has no content.");
-        }
-        if (FieldValidator.isBlank(objectType)) {
-            throw new BadRequestException("Object type is required.");
-        }
-        MultipartFile uploadedFile = byteArrayToMultipartFileExample(fileData, null);
-        return  storeRandomFile(uploadedFile, objectType, objectId);
-    }
-
-    //Store random file with UUID and extension
-    public FileMetadata storeRandomFile(MultipartFile uploadedFile, String objectType, Long objectId) throws IOException {
-        if (uploadedFile == null) {
-            throw new BadRequestException("Uploaded file has no content.");
-        }
-
-        if (FieldValidator.isBlank(objectType)) {
-            throw new BadRequestException("Object type is required.");
-        }
-
-        try {
-            String extension = "";
-            extension = "";
-            int i = uploadedFile.getOriginalFilename().lastIndexOf('.');
-            if (i > 0) {
-                extension = uploadedFile.getOriginalFilename().substring(i + 1);
-            }
-            //If extension empty
-            if(FieldValidator.isBlank(extension)){
-                extension = "txt";
-            }
-            UUID uuid = UUID.randomUUID();
-            String storedFileName = uuid + "." + extension;
-            Path relativeDiskPath = uploadFileToDisk(uploadedFile, storedFileName, "");
-            return saveFileMetaToDatabase(uploadedFile, relativeDiskPath, uuid, extension, objectType, objectId, null);
-        } catch (Exception ex) {
-            System.out.println("exception occured ");
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-    public Path uploadFileToDisk(MultipartFile uploadedFile, String storedFileName, String specifiedDirectory) throws IOException {
+    public Path uploadFileToDisk(MyFilePart uploadedFile, String storedFileName, String specifiedDirectory) throws IOException {
         if (uploadedFile == null) {
             throw new BadRequestException("Uploaded file has no content.");
         }
@@ -181,64 +119,94 @@ public class FileService {
 
         // Create the destination folder structure based on current date
         Path destinationFile = destinationFolder.resolve(storedFileName);
+
         // Save the file to the destination
-        Files.copy(uploadedFile.getInputStream(), destinationFile);
+        if (uploadedFile.getByteFile() != null) {
+            Files.write(destinationFile, uploadedFile.getByteFile());
+        } else if (uploadedFile.getMultipartFile() != null) {
+            Files.copy(uploadedFile.getMultipartFile().getInputStream(), destinationFile);
+        }
         return relativeDiskPath;
     }
 
-    private MultipartFile byteArrayToMultipartFileExample(byte[] fileData, String fileName){
-        if (FieldValidator.isBlank(fileName)) {
-            UUID uuid = UUID.randomUUID();
-            fileName = uuid + "." + "txt"; // Default filename if none provided
-        }
+    public FileMetadata storeMyFilePart(MyFilePart myFilePart, String objectType, Long objectId, String directory){
         try {
-            String fileNameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
-            String contentType = "text/plain";
-            // Convert byte[] to MultipartFile
-            return new ByteArrayMultipartFile(
-                    fileData,
-                    fileNameWithoutExtension,
-                    fileName,
-                    contentType
-            );
-        } catch (Exception e) {
-            throw new BadRequestException("Invalid request.");
+            UUID uuid = UUID.randomUUID();
+            String storedFileName = uuid.toString();
+            if (!FieldValidator.isBlank(myFilePart.getExtension())){
+                storedFileName += "." + myFilePart.getExtension();
+            }
+            //Upload file to disk
+            Path relativeDiskPath = uploadFileToDisk(myFilePart, storedFileName, directory);
+            //Save file metadata to database
+            return saveFileMetaToDatabase(myFilePart, relativeDiskPath, uuid, objectType, objectId);
+        } catch (Exception ex) {
+            System.out.println("exception occured ");
+            ex.printStackTrace();
+            throw new CustomException("Could not store file. Please try again later.");
         }
     }
 
-    private FileMetadata saveFileMetaToDatabase(MultipartFile uploadedFile, Path storedPath, UUID uuid, String extension, String objectType, Long objectId, String originalFileName) throws IOException {
-        GenPrivateFile fileEntity = new GenPrivateFile();
-        fileEntity.setDiskPath(storedPath.toString());
-        fileEntity.setCreationDate(LocalDateTime.now());
-        fileEntity.setFileExtension(extension);
-        fileEntity.setIsDeleted(false);
-        fileEntity.setMimeType(uploadedFile.getContentType());
-        fileEntity.setFileName(FieldValidator.isBlank(originalFileName) ? uploadedFile.getOriginalFilename() : originalFileName);
-        fileEntity.setObjectType(objectType);
-        fileEntity.setObjectId(objectId);
-        fileEntity.setWebPath(uuid.toString());
+    //Store random file with UUID and extension
+    public FileMetadata storeRandomFile(MultipartFile uploadedFile, String objectType, Long objectId){
+        if (uploadedFile == null) {
+            throw new BadRequestException("Uploaded file has no content.");
+        }
 
-        //JWT token generation for file access
-        String jwt = jwtUtil.generateAccessToken(uuid.toString());
-        fileEntity.setFileSizeMb((double) uploadedFile.getSize() / 1000000.0);
-        fileEntity = repository.save(fileEntity);
+        if (FieldValidator.isBlank(objectType)) {
+            throw new BadRequestException("Object type is required.");
+        }
+        MyFilePart myFilePart = new MyFilePart(uploadedFile);
+        return storeMyFilePart(myFilePart, objectType, objectId, null);
+    }
 
-        FileMetadata fd = new FileMetadata();
-        fd.setFileId(fileEntity.getId());
-        fd.setCreationDate(fileEntity.getCreationDate());
-        fd.setDownloadPath(FILE_SERVER_URL + "/files/download/"
-                + fileEntity.getWebPath() + "/" + jwt);
-        fd.setFileExtension(fileEntity.getFileExtension());
-        fd.setFileName(fileEntity.getFileName());
-        fd.setFileSizeMb(fileEntity.getFileSizeMb());
-        fd.setMimeType(fileEntity.getMimeType());
-        fd.setObjectId(fileEntity.getObjectId());
-        fd.setObjectType(fileEntity.getObjectType());
-        fd.setThumbnailBas64(fileEntity.getThumbnailBas64());
-        fd.setViewPath(FILE_SERVER_URL + "/files/view/"
-                + fileEntity.getWebPath() + "/" + jwt);
-        fd.setCreatedBy(fileEntity.getCreatedBy());
-        return fd;
+    public FileMetadata storeRandomFile(byte[] fileData, String objectType, Long objectId){
+        if (FieldValidator.isBlank(fileData)) {
+            throw new BadRequestException("Uploaded file has no content.");
+        }
+        if (FieldValidator.isBlank(objectType)) {
+            throw new BadRequestException("Object type is required.");
+        }
+
+        MyFilePart myFilePart = new MyFilePart(fileData);
+        return storeMyFilePart(myFilePart, objectType, objectId, null);
+    }
+
+    //directory mandatory, fileName null -> random uuid with extension
+    public FileMetadata storeSpecificFile(MultipartFile uploadedFile, String directory, String specificFileName, String objectType, Long objectId) throws IOException {
+        if (uploadedFile == null) {
+            throw new BadRequestException("Uploaded file has no content.");
+        }
+
+        if (FieldValidator.isBlank(objectType)) {
+            throw new BadRequestException("Object type is required.");
+        }
+
+        if (FieldValidator.isBlank(directory)) {
+            throw new BadRequestException("Directory is required.");
+        }
+
+        MyFilePart myFilePart = new MyFilePart(uploadedFile, specificFileName);
+        return storeMyFilePart(myFilePart, objectType, objectId, directory);
+    }
+
+    //save with byte array
+    //save with specific file name
+    public FileMetadata storeSpecificFile(byte[] fileData, String directory, String specificFileName, String objectType, Long objectId) throws IOException {
+        if (fileData == null) {
+            throw new BadRequestException("Uploaded file has no content.");
+        }
+
+        if (FieldValidator.isBlank(directory)) {
+            throw new BadRequestException("Directory is required.");
+        }
+
+        if (FieldValidator.isBlank(objectType)) {
+            throw new BadRequestException("Object type is required.");
+        }
+
+        MyFilePart myFilePart = new MyFilePart(fileData, specificFileName);
+        return storeMyFilePart(myFilePart, objectType, objectId, directory);
     }
 
     public List<FileMetadata> storeMultipleFile(MultipartFile[] files, String objectType, Long objectId) throws IOException {
@@ -252,21 +220,21 @@ public class FileService {
     public Resource loadFile(String baseFilename, String token) {
         try {
             validateToken(token);
-            GenPrivateFile fileEntity = repository.findByWebPath(baseFilename).orElseThrow(() -> new FileNotFoundException("File not found."));
+            GenPrivateFile fileEntity = repository.findByWebPath(baseFilename).orElseThrow(() -> new ResourceNotFoundException("File not found."));
             Path file = rootLocation.resolve(fileEntity.getDiskPath());
             return new UrlResource(file.toUri());
         } catch (Exception e) {
-            throw new RuntimeException("File not found.");
+            throw new ResourceNotFoundException("File not found.");
         }
     }
 
     public Resource loadFileAsResource(String baseFilename, String token) throws IOException {
         validateToken(token);
-        GenPrivateFile fileEntity = repository.findByWebPath(baseFilename).orElseThrow(() -> new FileNotFoundException("File not found."));
+        GenPrivateFile fileEntity = repository.findByWebPath(baseFilename).orElseThrow(() -> new ResourceNotFoundException("File not found."));
         Path filePath = rootLocation.resolve(fileEntity.getDiskPath()).normalize();
         Resource resource = new UrlResource(filePath.toUri());
         if (!resource.exists() || !resource.isReadable()) {
-            throw new FileNotFoundException("File not found.");
+            throw new ResourceNotFoundException("File not found.");
         }
         return resource;
     }
@@ -287,13 +255,9 @@ public class FileService {
             Files.deleteIfExists(file);
             repository.delete(fileEntity);
         } catch (IOException e) {
-            throw new RuntimeException("Could not delete file");
+            throw new CustomException("Could not delete file");
         }
     }
-
-    /*public List<FileMetadata> listAllFiles() {
-        return repository.findAll();
-    }*/
 
     public String getContentType(Resource resource) throws IOException {
         Path filePath = resource.getFile().toPath();
@@ -301,6 +265,5 @@ public class FileService {
         return (contentType != null) ? contentType : "application/octet-stream";
     }
 
-
-    //@Todo url again web path
+    //@Todo url against web path
 }
