@@ -5,6 +5,7 @@ import com.example.fileserver.domain.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -39,6 +40,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<?>> handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
         String message = String.format("Missing required request parameter: '%s'", ex.getParameterName());
         log.warn("Validation failed: {}", message);
+        ApiResponse<?> response = ApiResponse.error(message, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<?>> handleMissingRequestBody(HttpMessageNotReadableException ex) {
+        String message = "Required request body is missing or malformed.";
+        log.warn("Request body error: {}", ex.getMessage());
         ApiResponse<?> response = ApiResponse.error(message, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
