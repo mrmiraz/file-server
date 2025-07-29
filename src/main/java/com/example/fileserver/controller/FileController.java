@@ -3,6 +3,7 @@ package com.example.fileserver.controller;
 import com.example.fileserver.domain.dto.ApiResponse;
 import com.example.fileserver.service.FileService;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -60,6 +61,7 @@ public class FileController {
     public ResponseEntity<Resource> download(@PathVariable String filename, @PathVariable String token) {
         Resource file = fileService.loadFile(filename, token);
         return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getFilename() + "\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(file);
     }

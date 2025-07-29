@@ -1,8 +1,8 @@
 package com.example.fileserver.service;
 
 import com.example.fileserver.config.StorageProperties;
-import com.example.fileserver.domain.dto.FileMetadata;
 import com.example.fileserver.domain.dto.MyFilePart;
+import com.example.fileserver.domain.dto.FileMetadata;
 import com.example.fileserver.domain.entity.GenPrivateFile;
 import com.example.fileserver.exception.BadRequestException;
 import com.example.fileserver.exception.CustomException;
@@ -27,18 +27,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class FileService {
-    /*FileMetadata storeFile(MultipartFile file) throws IOException;
-    Resource loadFile(String filename);
-    void deleteFile(String filename);
-    List<FileMetadata> listAllFiles();*/
-
     private final Path rootLocation;
     private final FileMetadataRepository repository;
     private final JwtUtil jwtUtil;
@@ -55,7 +47,7 @@ public class FileService {
         try {
             Files.createDirectories(rootLocation);
         } catch (IOException e) {
-            throw new CustomException("Could not initialize storage");
+            throw new CustomException("Could not initialize storage.");
         }
     }
 
@@ -133,8 +125,11 @@ public class FileService {
         try {
             UUID uuid = UUID.randomUUID();
             String storedFileName = uuid.toString();
-            if (!FieldValidator.isBlank(myFilePart.getExtension())){
-                storedFileName += "." + myFilePart.getExtension();
+            if (!FieldValidator.isBlank(myFilePart.getExtension())) {
+                 storedFileName += "." + myFilePart.getExtension();
+            }
+            else {
+//                storedFileName += "." + detectByMagic(myFilePart.getByteFile());
             }
             //Upload file to disk
             Path relativeDiskPath = uploadFileToDisk(myFilePart, storedFileName, directory);
@@ -143,7 +138,7 @@ public class FileService {
         } catch (Exception ex) {
             System.out.println("exception occured ");
             ex.printStackTrace();
-            throw new CustomException("Could not store file. Please try again later.");
+            throw new CustomException("Could not store file.");
         }
     }
 
@@ -255,7 +250,7 @@ public class FileService {
             Files.deleteIfExists(file);
             repository.delete(fileEntity);
         } catch (IOException e) {
-            throw new CustomException("Could not delete file");
+            throw new ResourceNotFoundException("Could not delete file");
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.fileserver.domain.dto;
 
+import com.example.fileserver.util.type_detector.TikaFileTypeDetector;
 import com.example.fileserver.util.validator.FieldValidator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,7 +24,7 @@ public class MyFilePart {
     public MyFilePart(byte[] bytes, String originalFilename) {
         this.byteFile = bytes;
         this.size = bytes.length;
-        this.contentType = "text/plain";
+        this.contentType = TikaFileTypeDetector.detectMimeType(bytes);
         this.sizeMb =  (double) size / (1024 * 1024); // Convert bytes to MB
         setOriginalFileName(originalFilename);
     }
@@ -32,12 +33,13 @@ public class MyFilePart {
         this(bytes, null);
     }
 
-    public MyFilePart(MultipartFile multipartFile, String originalFilename) {
+    public MyFilePart(MultipartFile multipartFile, String specificFileName) {
         this.multipartFile = multipartFile;
         this.size = multipartFile.getSize();
         this.contentType = multipartFile.getContentType();
         this.sizeMb =  (double) size / (1024 * 1024); // Convert bytes to MB
-        setOriginalFileName(originalFilename);
+        setOriginalFileName(FieldValidator.isBlank(specificFileName)?
+                multipartFile.getOriginalFilename() : specificFileName);
     }
 
     public MyFilePart(MultipartFile multipartFile) {
@@ -56,9 +58,14 @@ public class MyFilePart {
 
     public void setExtension(String originalFilename){
         String extension = "";
-        int i = originalFilename.lastIndexOf('.');
-        if (i > 0) {
-            extension = originalFilename.substring(i + 1);
+        if (originalFilename != null) {
+            int i = originalFilename.lastIndexOf('.');
+            if (i > 0 && i < originalFilename.length() - 1) {
+                extension = originalFilename.substring(i + 1);
+            }
+        }
+        else {
+            extension = contentType.split("/")[1];
         }
         this.extension = extension;
     }
