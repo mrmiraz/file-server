@@ -73,8 +73,7 @@ public class FileService {
         FileMetadata fd = new FileMetadata();
         fd.setFileId(fileEntity.getId());
         fd.setCreationDate(fileEntity.getCreationDate());
-        fd.setDownloadPath(FILE_SERVER_URL + "/files/download/"
-                + fileEntity.getWebPath() + "/" + jwt);
+        fd.setDownloadPath(getDownloadFileUrl(fileEntity.getWebPath()));
         fd.setFileExtension(fileEntity.getFileExtension());
         fd.setFileName(fileEntity.getFileName());
         fd.setFileSizeMb(fileEntity.getFileSizeMb());
@@ -82,8 +81,7 @@ public class FileService {
         fd.setObjectId(fileEntity.getObjectId());
         fd.setObjectType(fileEntity.getObjectType());
         fd.setThumbnailBas64(fileEntity.getThumbnailBas64());
-        fd.setViewPath(FILE_SERVER_URL + "/files/view/"
-                + fileEntity.getWebPath() + "/" + jwt);
+        fd.setViewPath(getViewFileUrl(fileEntity.getWebPath()));
         fd.setCreatedBy(fileEntity.getCreatedBy());
         return fd;
     }
@@ -260,5 +258,15 @@ public class FileService {
         return (contentType != null) ? contentType : "application/octet-stream";
     }
 
-    //@Todo url against web path
+    //view url against web path
+    public String getViewFileUrl(String webPath) {
+        String token = jwtUtil.generateAccessToken(webPath);
+        return FILE_SERVER_URL + "/files/view/" + webPath + "/" + token;
+    }
+
+    //download url against web path
+    public String getDownloadFileUrl(String webPath) {
+        String token = jwtUtil.generateAccessToken(webPath);
+        return FILE_SERVER_URL + "/files/download/" + webPath + "/" + token;
+    }
 }
